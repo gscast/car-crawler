@@ -2,24 +2,28 @@
 import zipfile
 import sys
 import os
+from pathlib import Path
+
+def uncompress_zips(root, regex="*.zip"):
+    rootdir = Path(root)
+
+    for path in rootdir.rglob(regex):
+
+        dstdir = path.parent.joinpath(path.stem)
+        os.makedirs(dstdir, exist_ok=True)
+
+        zipref = zipfile.ZipFile(path)
+        zipref.extractall(dstdir)
+        zipref.close()
+
+        os.remove(path)
 
 def main():
+
     parent_dir = sys.argv[1]
 
-    for dirpath, _, filenames in os.walk(parent_dir):
-        for fn in filenames:
-
-            if fn == "AREA_IMOVEL.zip":
-                
-                dstdir = os.path.join(dirpath, "AREA_IMOVEL")
-                os.makedirs(dstdir, exist_ok=True)
-
-                fp = os.path.join(dirpath, fn)
-                zip_ref = zipfile.ZipFile(fp)
-                zip_ref.extractall(dstdir)
-                zip_ref.close()
-
-                # os.remove(fp)
+    uncompress_zips(parent_dir, regex="*/SHAPE_*.zip")
+    uncompress_zips(parent_dir, regex="*/AREA_IMOVEL.zip")
 
 if __name__ == "__main__":
     main()
