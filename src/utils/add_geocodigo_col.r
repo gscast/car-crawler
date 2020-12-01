@@ -30,6 +30,10 @@ for (regex in patterns) {
 
 date <- as.Date(basename(dir_path), format = "%Y%m%d")
 
+if (is.na(date)) {
+    stop("Input directory should be a date such as YYYYMMDD")
+}
+
 reshape_df <- function(x) {
 
     #get geocode from folder name

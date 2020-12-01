@@ -15,16 +15,20 @@ if (length(args) < 1) {
 dir_path <- args[1]
 dst_path <- args[2]
 
-files <- unique(list.files(
+# find the files with each year's properties info.
+files <- list.files(
     path = dir_path, pattern = "*_area_imovel.dbf",
     full.names = TRUE, recursive = TRUE
-))
+)
 
 print(files)
 
 df_list <- lapply(files, read.dbf, as.is = TRUE)
+
+# join the yearly tables.
 df_cod_imovel <- bind_rows(df_list)
 
+# get the oldest date for each property with the same identification.
 cod_imovel_primeira_data <-  df_cod_imovel %>%
     group_by(COD_IMOVEL) %>%
     summarise(PRIMEIRA_DATA = min(DATA)) %>%
