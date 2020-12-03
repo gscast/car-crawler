@@ -12,6 +12,7 @@ from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.firefox.options import Options
 
 from image_processing import process_img
 
@@ -31,6 +32,11 @@ class ScrapingBotCAR:
         if not os.path.isdir(self.download_dir):
             os.makedirs(self.download_dir, exist_ok=True)
 
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+
         # define download location and suprees download pop up
         profile = webdriver.FirefoxProfile()
         profile.set_preference(
@@ -40,12 +46,12 @@ class ScrapingBotCAR:
         profile.set_preference('browser.download.dir', self.download_dir)
         profile.set_preference(
             'browser.helperApps.neverAsk.saveToDisk', 'application/zip')
-        self.driver = webdriver.Firefox(profile)
+        self.driver = webdriver.Firefox(firefox_profile=profile, options=options)
 
         # configure tesseract OCR to read numbers, letters and define
         # --psm 6 for one line reading.
         valid_chars = string.ascii_letters + string.digits
-        self.tess_config = f"--psm 7 -c tessedit_char_whitelist={valid_chars}"
+        self.tess_config = f"--psm 6 -c tessedit_char_whitelist={valid_chars}"
 
         # define jascrip elements paths
         self.xpath = {
@@ -87,6 +93,10 @@ class ScrapingBotCAR:
             filename = f"SHAPE_{shp_parent.get_attribute('data-municipio')}.zip"
             downloaded_fp = os.path.join(self.download_dir, filename)
 
+            if os.path.exists(downloaded_fp):
+                print(f"Skipped: {downloaded_fp}\n")
+                continue
+
             shp_bttn = self.driver.find_element_by_xpath(
                 self.xpath["shp_parent"].format(idx=idx) + "/h4/i")
 
@@ -99,19 +109,22 @@ class ScrapingBotCAR:
             close_bttn = self.driver.find_element_by_xpath(
                 self.xpath["close_bttn"]
             )
+
             if not os.path.exists(downloaded_fp):
                 self.__perform_download_actions()
 
                 while not(os.path.exists(downloaded_fp)):
+                    time.sleep(1)
                     refresh_bttn.click()
                     self.__perform_download_actions()
+                    time.sleep(random.random())
 
             close_bttn.click()
+            print(f"Downloading: {downloaded_fp}\n")
 
         self.driver.quit()
 
     def __solve_captcha(self):
-        # now that we have the preliminary stuff out of the way time to get that image :D
         captcha_img = self.driver.find_element_by_xpath(
             self.xpath["captcha_img"])
 
@@ -119,21 +132,16 @@ class ScrapingBotCAR:
         size = captcha_img.size
         # saves screenshot of entire page
         img = self.driver.get_screenshot_as_png()
-
-        # uses PIL library to open image in memory
         img = Image.open(BytesIO(img))
+        rect = captcha_img.rect
+        img = img.crop((rect["x"], rect["y"],
+                        rect["x"] + rect["width"],
+                        rect["y"] + rect["height"]))
 
-        left = location['x']
-        top = location['y']
-        right = location['x'] + size['width']
-        bottom = location['y'] + size['height']
-
-        img = img.crop((left, top, right, bottom))  # defines crop points
-        # img.save("crawler/.tmp/captcha.png")
+        img.save("crawler/.tmp/captcha.png")
         img = process_img(img)
 
         answer = pytesseract.image_to_string(img, config=self.tess_config)
-        time.sleep(random.random())
         return answer.split('\n')[0]
 
     def __perform_download_actions(self):
