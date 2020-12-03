@@ -5,7 +5,7 @@ import pytesseract
 import string
 import requests
 import os
-
+from glob import glob
 import random
 from bs4 import BeautifulSoup
 from PIL import Image
@@ -13,6 +13,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import NoSuchElementException
 
 from image_processing import process_img
 
@@ -20,18 +21,18 @@ from image_processing import process_img
 class ScrapingBotCAR:
     """Scraping Bot for the SIICAR download page."""
 
-    def __init__(self, cod_estado="AP",
+    def __init__(self, cod_estado="MS",
                  download_dir="/media/gabriel/Gabriel/Datasets/CAR/2020",
                  email_addr="gabriel.sc@hotmail.com"):
 
         self.url = "https://www.car.gov.br/publico/imoveis/index"
-
         self.email = "gabriel.sc@hotmail.com"
         self.download_dir = os.path.join(download_dir, cod_estado)
 
         if not os.path.isdir(self.download_dir):
             os.makedirs(self.download_dir, exist_ok=True)
-
+        
+        # define headless browser
         options = Options()
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
@@ -65,8 +66,22 @@ class ScrapingBotCAR:
             "download_shp": ("/html/body/div[1]/div/div[2]/div[3]/div/div/div[2]"
                              + "/div[3]/div[3]/button/span[1]"),
             "shp_parent": ("/html/body/div[1]/div/div[2]/div[1]/div[2]"
-                           + "/div/div[{idx}]/div/div/button[1]")
+                           + "/div/div[{idx}]/div/div/button[1]"),
+            "change_uf_bttn": ("/html/body/div[1]/div/div[2]/div[1]/"
+                                 "div[1]/div/div/div[3]/button"),
+            "uf_bttn": "/html/body/div[1]/div/div[2]/div[2]/div/div/div[2]/div[{idx}]/a"
         }
+
+        # UF ids for acessing download page.
+        uf_id = {
+            "AC": 1, "AL": 2, "AP": 3, "AM": 4, "CE": 5, "DF": 6,
+            "ES": 7, "GO": 8, "MA": 9, "MS": 10, "MG": 11, "PA": 12,
+            "PB": 13, "PR": 14, "PE": 15, "PI": 16, "RJ": 17, "RN": 18,
+            "RS":19, "RR": 20, "SC":21, "SP": 22, "SE": 23, "TO": 24,
+            "RO": 25, "MT": 26, "BA": 27
+        }
+
+        self.uf_id = uf_id[cod_estado]
 
     def __call__(self):
         """Call bot."""
@@ -77,52 +92,61 @@ class ScrapingBotCAR:
             self.xpath["download_bttn"])
         download_bttn.click()
 
-        # iterate the cites shp buttons fpor download
+        # go to change UF menu
+        change_uf_bttn = self.driver.find_element_by_xpath(
+            self.xpath["change_uf_bttn"]
+        )
+        change_uf_bttn.click()
+
+        #change to uf download page
+        uf_bttn = self.driver.find_element_by_xpath(
+            self.xpath["uf_bttn"].format(idx = self.uf_id)
+        )
+        uf_bttn.click()
+
+        # iterate the cites shp buttons download
         idx = 1
         while True:
             time.sleep(0.5)
-            idx += 1
+            idx += 1 # city idx starts at two
+            
+            try:
+                shp_parent = self.driver.find_element_by_xpath(
+                    self.xpath["shp_parent"].format(idx=idx))
 
-            shp_parent = self.driver.find_element_by_xpath(
-                self.xpath["shp_parent"].format(idx=idx))
-
-            # no buttons left, end scapping
-            if shp_parent is None:
+            except NoSuchElementException:
+                # No more shp download butons
                 break
-
+            
+            # destination path
             filename = f"SHAPE_{shp_parent.get_attribute('data-municipio')}.zip"
             downloaded_fp = os.path.join(self.download_dir, filename)
 
+            #skip downloaded files
             if os.path.exists(downloaded_fp):
                 print(f"Skipped: {downloaded_fp}\n")
                 continue
-
+            
+            # click button to open captcha page
             shp_bttn = self.driver.find_element_by_xpath(
                 self.xpath["shp_parent"].format(idx=idx) + "/h4/i")
-
             shp_bttn.click()
+            time.sleep(1)
 
-            time.sleep(0.5)
-            refresh_bttn = self.driver.find_element_by_xpath(
-                self.xpath["refresh_bttn"])
+            self.__perform_download_actions()
 
-            close_bttn = self.driver.find_element_by_xpath(
-                self.xpath["close_bttn"]
-            )
-
-            if not os.path.exists(downloaded_fp):
+            # first attempt to donwload fail
+            # refresh captch and try until success
+            while not(os.path.exists(downloaded_fp)):
+                self.driver.find_element_by_xpath(
+                self.xpath["refresh_bttn"]).click()
                 self.__perform_download_actions()
 
-                while not(os.path.exists(downloaded_fp)):
-                    time.sleep(1)
-                    refresh_bttn.click()
-                    self.__perform_download_actions()
-                    time.sleep(random.random())
-
+            # close download pop-up
+            close_bttn = self.driver.find_element_by_xpath(
+                self.xpath["close_bttn"])
             close_bttn.click()
             print(f"Downloading: {downloaded_fp}\n")
-
-        self.driver.quit()
 
     def __solve_captcha(self):
         captcha_img = self.driver.find_element_by_xpath(
@@ -145,7 +169,7 @@ class ScrapingBotCAR:
         return answer.split('\n')[0]
 
     def __perform_download_actions(self):
-        time.sleep(0.5)
+        time.sleep(random.random())
 
         answer_txtbox = self.driver.find_element_by_xpath(
             self.xpath["answer_txtbox"])
@@ -155,6 +179,14 @@ class ScrapingBotCAR:
             self.xpath["email_txtbox"])
         download_shp = self.driver.find_element_by_xpath(
             self.xpath["download_shp"])
+
+        js_script = '''\
+            element1 = document.getElementById('alert-download-base');
+            element1.style.display = 'none';
+            element2 = document.getElementById('alert-download-error');
+            element2.style.display = 'none';
+        '''
+        self.driver.execute_script(js_script)
 
         answer_txtbox.clear()
         answer_txtbox.send_keys(self.__solve_captcha())
@@ -172,4 +204,7 @@ if __name__ == "__main__":
     try:
         bot()
     finally:
+        while bool(glob(os.path.join(bot.download_dir, "*.part"))):
+            pass
+
         bot.driver.quit()
