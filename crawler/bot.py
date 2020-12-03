@@ -185,6 +185,7 @@ class ScrapingBotCAR:
             element1.style.display = 'none';
             element2 = document.getElementById('alert-download-error');
             element2.style.display = 'none';
+            window.scrollTo(0, 0)
         '''
         self.driver.execute_script(js_script)
 
