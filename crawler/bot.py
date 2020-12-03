@@ -1,80 +1,167 @@
 import time
 from io import BytesIO
 
-import cv2
-import numpy as np
 import pytesseract
+import string
+import requests
+import os
+
+import random
 from bs4 import BeautifulSoup
 from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
 
-# def process_img(img):
-#     img = np.array(img) 
-#     # Convert RGB to BGR 
-#     img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+from image_processing import process_img
 
-#     mask = cv2.inRange(img, np.array([0, 0, 200]), np.array([250, 250, 255]))
 
-#     img[mask != 0] = [255, 255, 255]
-#     _, img = cv2.threshold(img, 0, 255, fcv2.THRESH_BINARY+cv2.THRESH_OTSU)
+class ScrapingBotCAR:
+    """Scraping Bot for the SIICAR download page."""
 
-#     img = cv2.erode(img, np.ones((5,2),np.uint8), iterations=1)
-#     img = cv2.dilate(img, np.ones((5,5),np.uint8), iterations=1)
+    def __init__(self, cod_estado="AP",
+                 download_dir="/media/gabriel/Gabriel/Datasets/CAR/2020",
+                 email_addr="gabriel.sc@hotmail.com"):
 
-#     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-#     img = Image.fromarray(img)
-# f
-#     return img
+        self.url = "https://www.car.gov.br/publico/imoveis/index"
 
-def get_captcha(driver, element, path):
-    # now that we have the preliminary stuff out of the way time to get that image :D
-    location = element.location
-    size = element.size
-    # saves screenshot of entire page
-    im = driver.get_screenshot_as_png()
+        self.email = "gabriel.sc@hotmail.com"
+        self.download_dir = os.path.join(download_dir, cod_estado)
 
-    driver.quit()
+        if not os.path.isdir(self.download_dir):
+            os.makedirs(self.download_dir, exist_ok=True)
 
-    # uses PIL library to open image in memory
-    im = Image.open(BytesIO(im)) 
+        # define download location and suprees download pop up
+        profile = webdriver.FirefoxProfile()
+        profile.set_preference(
+            'browser.download.folderList', 2)  # custom location
+        profile.set_preference(
+            'browser.download.manager.showWhenStarting', False)
+        profile.set_preference('browser.download.dir', self.download_dir)
+        profile.set_preference(
+            'browser.helperApps.neverAsk.saveToDisk', 'application/zip')
+        self.driver = webdriver.Firefox(profile)
 
-    left = location['x']
-    top = location['y']
-    right = location['x'] + size['width']
-    bottom = location['y'] + size['height']
-    
-    im = im.crop((left, top, right, bottom)) # defines crop points
+        # configure tesseract OCR to read numbers, letters and define
+        # --psm 6 for one line reading.
+        valid_chars = string.ascii_letters + string.digits
+        self.tess_config = f"--psm 7 -c tessedit_char_whitelist={valid_chars}"
 
-    # im = process_img(im)
-    im.save(path) # saves new cropped image
+        # define jascrip elements paths
+        self.xpath = {
+            "download_bttn": "/html/body/div[2]/div/div[2]/div[2]/div/div/div[3]/a/div[2]",
+            "captcha_img": '//*[@id="img-captcha-base-downloads"]',
+            "refresh_bttn": '//*[@id="btn-atualizar-captcha"]',
+            "answer_txtbox": '//*[@id="form-captcha-download-base"]',
+            "email_txtbox": '//*[@id="form-email-download-base"]',
+            "alert_message": '//*[@id="alert-download-error"]',
+            "close_bttn": "/html/body/div[1]/div/div[2]/div[3]/div/div/div[1]/button/span",
+            "download_shp": ("/html/body/div[1]/div/div[2]/div[3]/div/div/div[2]"
+                             + "/div[3]/div[3]/button/span[1]"),
+            "shp_parent": ("/html/body/div[1]/div/div[2]/div[1]/div[2]"
+                           + "/div/div[{idx}]/div/div/button[1]")
+        }
 
-    
+    def __call__(self):
+        """Call bot."""
+        self.driver.get(self.url)
 
-load_time = 5
-url = "https://www.car.gov.br/publico/imoveis/index"
+        # open downloads page
+        download_bttn = self.driver.find_element_by_xpath(
+            self.xpath["download_bttn"])
+        download_bttn.click()
 
-browser = webdriver.Firefox()
-browser.get(url)
+        # iterate the cites shp buttons fpor download
+        idx = 1
+        while True:
+            time.sleep(0.5)
+            idx += 1
 
-time.sleep(load_time)
+            shp_parent = self.driver.find_element_by_xpath(
+                self.xpath["shp_parent"].format(idx=idx))
 
-downloads_xpath = "/html/body/div[2]/div/div[2]/div[2]/div/div/div[3]/a/div[2]"
-downloads_bttn = browser.find_element_by_xpath(downloads_xpath)
-downloads_bttn.click()
+            # no buttons left, end scapping
+            if shp_parent is None:
+                break
 
-time.sleep(load_time)
+            filename = f"SHAPE_{shp_parent.get_attribute('data-municipio')}.zip"
+            downloaded_fp = os.path.join(self.download_dir, filename)
 
-shp_xpath = ("/html/body/div[1]/div/div[2]/div[1]/div[2]"
-             + "/div/div[2]/div/div/button[1]/h4/i")
+            shp_bttn = self.driver.find_element_by_xpath(
+                self.xpath["shp_parent"].format(idx=idx) + "/h4/i")
 
-shp_bttn = browser.find_element_by_xpath(shp_xpath)
-shp_bttn.click()
+            shp_bttn.click()
 
-time.sleep(load_time)
+            time.sleep(0.5)
+            refresh_bttn = self.driver.find_element_by_xpath(
+                self.xpath["refresh_bttn"])
 
-captcha_xpath = '//*[@id="img-captcha-base-downloads"]'
-captcha = browser.find_element_by_xpath(captcha_xpath)
+            close_bttn = self.driver.find_element_by_xpath(
+                self.xpath["close_bttn"]
+            )
+            if not os.path.exists(downloaded_fp):
+                self.__perform_download_actions()
 
-get_captcha(browser, captcha, "crawler/.tmp/captcha.png")
+                while not(os.path.exists(downloaded_fp)):
+                    refresh_bttn.click()
+                    self.__perform_download_actions()
+
+            close_bttn.click()
+
+        self.driver.quit()
+
+    def __solve_captcha(self):
+        # now that we have the preliminary stuff out of the way time to get that image :D
+        captcha_img = self.driver.find_element_by_xpath(
+            self.xpath["captcha_img"])
+
+        location = captcha_img.location
+        size = captcha_img.size
+        # saves screenshot of entire page
+        img = self.driver.get_screenshot_as_png()
+
+        # uses PIL library to open image in memory
+        img = Image.open(BytesIO(img))
+
+        left = location['x']
+        top = location['y']
+        right = location['x'] + size['width']
+        bottom = location['y'] + size['height']
+
+        img = img.crop((left, top, right, bottom))  # defines crop points
+        # img.save("crawler/.tmp/captcha.png")
+        img = process_img(img)
+
+        answer = pytesseract.image_to_string(img, config=self.tess_config)
+        time.sleep(random.random())
+        return answer.split('\n')[0]
+
+    def __perform_download_actions(self):
+        time.sleep(0.5)
+
+        answer_txtbox = self.driver.find_element_by_xpath(
+            self.xpath["answer_txtbox"])
+        alert_message = self.driver.find_element_by_xpath(
+            self.xpath["alert_message"])
+        email_txtbox = self.driver.find_element_by_xpath(
+            self.xpath["email_txtbox"])
+        download_shp = self.driver.find_element_by_xpath(
+            self.xpath["download_shp"])
+
+        answer_txtbox.clear()
+        answer_txtbox.send_keys(self.__solve_captcha())
+
+        email_txtbox.clear()
+        email_txtbox.send_keys(self.email)
+
+        download_shp.click()
+        return bool(alert_message is None)
+
+
+if __name__ == "__main__":
+    bot = ScrapingBotCAR()
+
+    try:
+        bot()
+    finally:
+        bot.driver.quit()
