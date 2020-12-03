@@ -1,19 +1,19 @@
+import os
+import random
+import string
 import time
+from glob import glob
 from io import BytesIO
 
 import pytesseract
-import string
 import requests
-import os
-from glob import glob
-import random
 from bs4 import BeautifulSoup
 from PIL import Image
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.support.ui import Select
 
 from image_processing import process_img
 
@@ -180,6 +180,8 @@ class ScrapingBotCAR:
         download_shp = self.driver.find_element_by_xpath(
             self.xpath["download_shp"])
 
+        # hide warning banners and scroll up to prevent
+        # captcha crop misalignment.
         js_script = '''\
             element1 = document.getElementById('alert-download-base');
             element1.style.display = 'none';
