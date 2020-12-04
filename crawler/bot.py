@@ -19,6 +19,7 @@ from selenium.webdriver.firefox.options import Options
 from image_processing import process_img
 import logging
 
+
 class MaxTriesExceeded(Exception):
     """Cannot solve captcha"""
 
@@ -30,10 +31,10 @@ class ScrapingBotCAR:
 
         self.url = "https://www.car.gov.br/publico/imoveis/index"
         self.email = email
-        self.uf = uf
         self.debug = debug
-        
-        logfile = os.path.join("crawler", ".log", f'{uf}_log.log')
+        self.uf = uf.upper()
+
+        logfile = os.path.join("crawler", ".log", f'downloaded_files.log')
         logging.basicConfig(filename=logfile)
 
         self.n_tries = 0
@@ -85,11 +86,11 @@ class ScrapingBotCAR:
         change_uf_bttn.click()
 
         # change to uf download page
-        uf_xpath = f'//a[@class="selecione-uf" and contains(@href, "{self.uf.upper()}")]'
+        uf_xpath = f'//a[@class="selecione-uf" and contains(@href, "{self.uf}")]'
         uf_bttn = self.driver.find_element_by_xpath(uf_xpath)
         uf_bttn.click()
 
-        logging.info(f"{self.uf} selected. Saving to {self.download_dir}\n")
+        logging.info(f"{self.uf} selected. Saving to {self.download_dir}")
 
         # iterate the cites shp buttons download
         cities_xpath = '//div[@class="item-municipio"]'
@@ -106,7 +107,15 @@ class ScrapingBotCAR:
 
             # skip downloaded files
             if os.path.exists(downloaded_fp):
-                logging.info(f"Skipped {city_text}: shapefile already downloaded.\n")
+                logging.info(
+                    f"Skipped {city_text}/{self.uf}: shapefile already downloaded.\n")
+                continue
+            
+            csv_filename = f"{shp_parent.get_attribute('data-municipio')}.csv"
+            csv_downloaded_fp = os.path.join(self.download_dir, csv_filename)
+            if os.path.exists(csv_downloaded_fp):
+                logging.warning(
+                    f"Skipped {city_text}/{self.uf}: csv already downloaded.\n")
                 continue
 
             # click button to open captcha page
@@ -130,7 +139,7 @@ class ScrapingBotCAR:
                         raise MaxTriesExceeded
 
             except MaxTriesExceeded:
-                error = f"Skipped {city_text}: max tries exceeded."
+                error = f"Skipped {city_text}/{self.uf}: max tries exceeded."
                 print(error+"\n")
                 logging.error(error)
                 continue
@@ -141,7 +150,7 @@ class ScrapingBotCAR:
                                "/div/div/div[1]/button/span")
                 close_bttn = self.driver.find_element_by_xpath(close_xpath)
                 close_bttn.click()
-                time.sleep(0.1+ random.random())
+                time.sleep(0.1 + random.random())
 
             logging.info(f"Downloading shapefile for {city_text}:\n" +
                          f"\t {downloaded_fp}")
