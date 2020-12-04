@@ -2,21 +2,20 @@ import os
 import random
 import string
 import time
+import sys
 from glob import glob
 from io import BytesIO
 
 import pytesseract
 import requests
+import argparse
 from bs4 import BeautifulSoup
 from PIL import Image
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.support.ui import Select
 
 from image_processing import process_img
-
 
 class ScrapingBotCAR:
     """Scraping Bot for the SIICAR download page."""
@@ -200,9 +199,19 @@ class ScrapingBotCAR:
         download_shp.click()
         return bool(alert_message is None)
 
+def get_args(argv):
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("dst")
+    parser.add_argument("--uf", required=True)
+    parser.add_argument("--email", required=True)
+    
+    return parser.parse_args(argv)
 
 if __name__ == "__main__":
-    bot = ScrapingBotCAR()
+    args = get_args(sys.argv[1:])
+
+    bot = ScrapingBotCAR(args.uf, args.dst, args.email)
 
     try:
         bot()
