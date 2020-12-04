@@ -130,7 +130,7 @@ class ScrapingBotCAR:
                         raise MaxTriesExceeded
 
             except MaxTriesExceeded:
-                error = f"Skipped: {city_text}: max tries exceeded."
+                error = f"Skipped {city_text}: max tries exceeded."
                 print(error+"\n")
                 logging.error(error)
                 continue
@@ -141,10 +141,10 @@ class ScrapingBotCAR:
                                "/div/div/div[1]/button/span")
                 close_bttn = self.driver.find_element_by_xpath(close_xpath)
                 close_bttn.click()
-                time.sleep(random.random())
+                time.sleep(0.1+ random.random())
 
-            print(f"Downloading shapefile for {city_text}:\n" +
-                  f"\t {downloaded_fp}")
+            logging.info(f"Downloading shapefile for {city_text}:\n" +
+                         f"\t {downloaded_fp}")
 
     def __solve_captcha(self):
         captcha_xpath = '//*[@id="img-captcha-base-downloads"]'
@@ -226,5 +226,5 @@ if __name__ == "__main__":
             pass
         bot.driver.quit()
 
-    for f in glob(os.path.join(bot.download_dir, "*(1).zip")):
-        os.remove(f)
+        for f in glob(os.path.join(bot.download_dir, "*(1).zip")):
+            os.remove(f)
