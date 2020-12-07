@@ -130,3 +130,5 @@ dmypy.json
 
 # The crawler
 .crawler
+.dataset-info
+CAR-INFO.md
