@@ -129,6 +129,5 @@ dmypy.json
 .pyre/
 
 # The crawler
-.crawler
-.dataset-info
+crawler
 CAR-INFO.md
