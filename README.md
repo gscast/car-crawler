@@ -5,6 +5,7 @@ O CAR é um registro público eletrônico de âmbito nacional, obrigatório para
 -------------------------------------------------------------------------------------------------------
 # Uso
 A fim de reunir e integrar dados sobre o CAR, foram elaboradas ferramentas a fim de utilizar os shapefiles, disponíveis no no SICAR:
+
     - [bot.py](crawler/bot.py): crawler para baixar os shapefiles de todas as cidades de uma UF
     - [collect_shp.r](src/collect_shp.r): gera um arquivo .dbf integrando as informações contidas nos shapefiles.
     - [csv2shp.r](src/csv2shp.r): converte a tabela CSV em um SHP com mesma estrutura do shapefile.
