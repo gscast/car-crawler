@@ -3,6 +3,7 @@ library(foreign)
 library(tidyverse)
 library(dplyr)
 library(gsubfn)
+library(data.table)
 
 # read the input and output dir_paths from user
 read_input <- function() {
@@ -20,7 +21,7 @@ read_input <- function() {
     dir_path <- args[1]
     dst_path <- args[2]
 
-    return(list(dirpath = dir_path, dst_path = dst_path))
+    return(list(dir_path = dir_path, dst_path = dst_path))
 }
 
 # get date from dir_path
@@ -53,16 +54,10 @@ extract_date <- function(dir_path) {
 
 # fetch the database files in dir_path matching the valid patterns.
 fetch_dbf <- function(dir_path) {
-    patterns <- c("*AREA_IMOVEL.dbf", "*_Area_imovel_albers.dbf")
-    files <- c()
-
-    for (regex in patterns) {
-        to_append <- list.files(
-            path = dir_path, pattern = regex,
-            full.names = TRUE, recursive = TRUE
-        )
-        files <- append(files, to_append)
-    }
+    files <- list.files(
+        path = dir_path, pattern = "albers.dbf$",
+        full.names = TRUE, recursive = TRUE
+    )
 
     if (!length(files)) {
         stop(
@@ -70,44 +65,33 @@ fetch_dbf <- function(dir_path) {
             .call = FALSE
         )
     }
-
+    # print(files)
+    # stop()
     return(files)
 }
 
-user_input <- read_input()
-dir_path <- user_input["dir_path"]
-dst_path <- user_input["dst_path"]
-
-data_registro <- extract_date(dir_path)
-files <- fetch_dbf(dir_path)
-
 # add the register date and geocode in each dbf observation
-reshape_df <- function(file) {
-    city_data <- read.dbf(file, as.is = TRUE) %>%
-        add_column(DATA = data_registro)
-
-    # get geocode from folder name
-    geocode <- stringr::str_split(
-        basename(dirname(dirname(x))), "_"
-    )[[1]][2]
-
-    # geocode found
-    if (!is.na(geocode)) {
-        city_data <- add_column(city_data, geocodigo = geocode)
-    }
-
+add_date <- function(file, date) {
+    city_data <- data.table(read.dbf(file, as.is = TRUE))
+    city_data[, DATA := date]
     return(city_data)
 }
 
-stacked_df <- lapply(files, reshape_df) %>%
-    dplyr::bind_rows()
+user_input <- read_input()
 
-str(stacked_df)
-
-output_fp <- file.path(dst_path, paste0(basename(dst_path), "_area_imovel.dbf"))
-write.dbf(
-    as.data.frame(stacked_df),
-    output_fp
+car_brasil <- rbindlist((
+    lapply(fetch_dbf(user_input$dir_path), add_date,
+        date = extract_date(user_input$dir_path))),
+    use.names = TRUE
 )
 
-print("Resulting database: ", output_fp)
+output_fp <- file.path(
+    user_input$dst_path,
+    paste0(
+        basename(user_input$dir_path),
+        "_CAR_Brasil.csv"
+    )
+)
+
+str(car_brasil)
+fwrite(car_brasil, output_fp, sep = ";")

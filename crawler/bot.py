@@ -16,7 +16,7 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.firefox.options import Options
 
-from crawler.image_processing import process_img
+from image_processing import process_img
 import logging
 
 

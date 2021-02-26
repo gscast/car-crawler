@@ -1,24 +1,42 @@
 library(foreign)
 library(tidyverse)
 library(dplyr)
+library(data.table)
 
-csv_path <- "/home/gabriel/Desktop/tmp/1200013.csv"
-dbf_path <- "/home/gabriel/Desktop/tmp/SHAPE_1200013/AREA_IMOVEL/AREA_IMOVEL.dbf"
+read_input <- function() {
+       args <- commandArgs(trailingOnly = TRUE)
+       return(args[1])
+}
 
-area_imovel_colnames <- colnames(dbf_df)
+# fetch the database files in dir_path matching the valid patterns.
+fetch_csv <- function(dir_path) {
+       files <- list.files(
+              path = dir_path, pattern = "*\\.csv$",
+              full.names = TRUE, recursive = TRUE
+       )
 
-dbf_df <- read.dbf(dbf_path, as.is = TRUE) %>%
-            mutate(NUM_AREA = round(NUM_AREA, digits = 4)) %>%
-            arrange(COD_IMOVEL)
+       if (!length(files)) {
+              stop(
+                     "No valid *.csv files found",
+                     .call = FALSE
+              )
+       }
 
-csv_df <- read.csv2(csv_path, skip = 3, header = FALSE, as.is = TRUE,
-                    col.names = area_imovel_colnames) %>%
-                mutate(NUM_AREA = as(NUM_AREA),
-                       NUM_MODULO = as.numeric(NUM_MODULO)) %>%
-                arrange(COD_IMOVEL)
+       return(files)
+}
 
+col_names <- c(
+       "COD_IMOVEL", "NUM_AREA", "COD_ESTADO",
+       "NOM_MUNICI", "NUM_MODULO", "TIPO_IMOVE",
+       "SITUACAO", "CONDICAO_I"
+)
 
-attr(csv_df, 'data_types') <- attributes(dbf_df)$data_types
+convert_csv <- function(csv) {
+       print(csv)
+       dt <- fread(csv, col.names = col_names)
+       head(dt)
+       stop()
+       write.dbf(gsub(".csv$", ".dbf", file), dt)
+}
 
-head(dbf_df)
-head(csv_df)
+lapply(fetch_csv(read_input()), convert_csv)

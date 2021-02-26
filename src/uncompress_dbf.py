@@ -2,12 +2,13 @@
 import zipfile
 import sys
 import os
+import tqdm
 from pathlib import Path
 
 def uncompress_zips(root, regex="*.zip"):
     rootdir = Path(root)
 
-    for path in rootdir.rglob(regex):
+    for path in tqdm.tqdm(list(rootdir.rglob(regex))):
 
         dstdir = path.parent.joinpath(path.stem)
         os.makedirs(dstdir, exist_ok=True)
