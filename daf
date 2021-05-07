@@ -1,0 +1,29 @@
+remove.packages             package:utils              R Documentation
+
+_R_e_m_o_v_e _I_n_s_t_a_l_l_e_d _P_a_c_k_a_g_e_s
+
+_D_e_s_c_r_i_p_t_i_o_n:
+
+     Removes installed packages/bundles and updates index information
+     as necessary.
+
+_U_s_a_g_e:
+
+     remove.packages(pkgs, lib)
+     
+_A_r_g_u_m_e_n_t_s:
+
+    pkgs: a character vector with the names of the packages to be
+          removed.
+
+     lib: a character vector giving the library directories to remove
+          the packages from.  If missing, defaults to the first element
+          in ‘.libPaths()’.
+
+_S_e_e _A_l_s_o:
+
+     On Unix-alikes, ‘REMOVE’ for a command line version;
+
+     ‘install.packages’ for installing packages.
+
+

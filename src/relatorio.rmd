@@ -1,0 +1,17 @@
+---
+title: "Relação de Conteúdo dos Datasets CAR"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(knitr)
+library(foreign)
+
+## Bases IPAM
+
+### IPAM 2014
+
+
+## Analysis
